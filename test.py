@@ -6,6 +6,9 @@ import RPi.GPIO as GPIO
 import time
 import i2cEncoderLibV2
 
+import paho.mqtt.client as mqtt
+import json
+
 class RadioStack():
 
     FREQ_SEG_1 = 121
@@ -73,6 +76,13 @@ class RadioStack():
 
         self.last_active = time.time()
 
+        self.init_mqtt()
+
+    def init_mqtt(self):
+        mqttBroker ="localhost"
+
+        self.mqttClient = mqtt.Client("Pi")
+        self.mqttClient.connect(mqttBroker) 
 
     def init_encoders(self):
         GPIO.setup(self.encoder_int_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -123,9 +133,19 @@ class RadioStack():
 
             self.LAST_RECEIVED_ADDR = encoder.i2cadd
             self.ALTITUDE = value
+
+            data = {
+                "ALTITUDE": self.ALTITUDE
+            }
+            self.mqttClient.publish("FS_DATA_IN", json.dumps(data))
             
         def AltEncoderDoublePush(encoder):
             self.ACTIVE_ALTITUDE = self.ALTITUDE
+            data = {
+                "ALTITUDE": self.ALTITUDE
+            }
+            self.mqttClient.publish("FS_DATA_IN", json.dumps(data))
+
 
         def AltEncoderPush(encoder):
             if self.ALTITUDE_STEP == 100:
@@ -155,9 +175,17 @@ class RadioStack():
 
             self.LAST_RECEIVED_ADDR = encoder.i2cadd
             self.HEADING = value
+            data = {
+                "HEADING": self.HEADING
+            }
+            self.mqttClient.publish("FS_DATA_IN", json.dumps(data))
             
         def HdgEncoderPush(encoder):
             self.ACTIVE_HEADING = self.HEADING
+            data = {
+                "HEADING": self.HEADING
+            }
+            self.mqttClient.publish("FS_DATA_IN", json.dumps(data))
 
         self.encoders[encoderAddress].onChange = HdgEncoderChange
         self.encoders[encoderAddress].onButtonPush = HdgEncoderPush
@@ -178,9 +206,18 @@ class RadioStack():
 
             self.LAST_RECEIVED_ADDR = encoder.i2cadd
             self.SPEED = value
+
+            data = {
+                "SPEED": self.SPEED
+            }
+            self.mqttClient.publish("FS_DATA_IN", json.dumps(data))
             
         def SpdEncoderPush(encoder):
             self.ACTIVE_SPEED = self.SPEED
+            data = {
+                "SPEED": self.SPEED
+            }
+            self.mqttClient.publish("FS_DATA_IN", json.dumps(data))
 
         self.encoders[encoderAddress].onChange = SpdEncoderChange
         self.encoders[encoderAddress].onButtonPush = SpdEncoderPush
@@ -203,6 +240,8 @@ class RadioStack():
                 self.FREQ_SEG_1 = value
             else:
                 self.FREQ_SEG_2 = value
+
+            self.activate_frequency()
 
         def FreqEncoderPush(encoder):
             if self.FREQ_SEC_ACTIVE == 1:
@@ -236,6 +275,11 @@ class RadioStack():
     def activate_frequency(self):
         self.ACTIVE_FREQ_SEG_1 = self.FREQ_SEG_1
         self.ACTIVE_FREQ_SEG_2 = self.FREQ_SEG_2
+
+        data = {
+            "RADIO_COM_1": int(f'{self.FREQ_SEG_1}{self.FREQ_SEG_2}')
+        }
+        self.mqttClient.publish("FS_DATA_IN", json.dumps(data))
 
     def init_value_encoder(self, encoderAddress):
         self.encoders[encoderAddress].writeAntibouncingPeriod(10)
@@ -415,14 +459,26 @@ class RadioStack():
 
         return rows
 
+    def on_message(self, client, userdata, message):
+
+        data = json.loads(message.payload)
+
+        self.ACTIVE_ALTITUDE = self.ALTITUDE = data['altitude']
+
+        print("received message: " ,str(message.payload.decode("utf-8")))
 
     def run(self):
+
+        self.mqttClient.loop_start()
+
+        self.mqttClient.subscribe("FS_DATA_OUT")
+        self.mqttClient.on_message=self.on_message 
+
         self.lcd.lcd_clear()
 
         self.last_active = time.time() - 10
 
         while True:
-
             if (time.time() - self.last_active) < 10:
                 rows = []
                 rows.append("Actv: %s" % self.MENU_ITEMS[self.MENU_ITEMS_KEYS[self.ACTIVE_MENU_ITEM]]['display_name'])
@@ -439,7 +495,7 @@ class RadioStack():
             for i in range(len(rows)):
                 self.lcd.lcd_display_string_pos(rows[i].ljust(20, " "), (i + 1), 0)
 
-
+        client.loop_stop()
 
 config = {
     'lcd_address': 0x27,
@@ -463,8 +519,6 @@ radioStack.run()
 
 
 
-    
 
 
-    
-    
+
