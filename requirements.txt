@@ -1,0 +1,5 @@
+RPi.GPIO
+i2c_lcd
+smbus2
+paho_mqtt
+wiringpi

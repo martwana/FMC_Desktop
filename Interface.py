@@ -1,11 +1,12 @@
 #! /usr/bin/env python3
 
 import i2c_lcd
+import TM1637
 
 class Interface():
 
     lcd = None
-    lcd_address = None
+    config = None
 
     ACTIVE_MENU_ITEM = 0
 
@@ -16,18 +17,19 @@ class Interface():
             "variable_right": "RADIO_COM_1_STBY_RIGHT",
             "variable_active": "RADIO_COM_1_ACTIVE"
         },
-        "ALTITUDE": {
-            "display_name": "Altitude",
-            "variable": "ALTITUDE"
+        "SPEED": {
+            "display_name": "Speed",
+            "variable": "SPEED"
         },
         "HEADING": {
             "display_name": "Heading",
             "variable": "HEADING"
         },
-        "SPEED": {
-            "display_name": "Speed",
-            "variable": "SPEED"
+        "ALTITUDE": {
+            "display_name": "Altitude",
+            "variable": "ALTITUDE"
         }
+        
     }
 
     VALUES = {
@@ -36,18 +38,34 @@ class Interface():
         'RADIO_COM_1_ACTIVE': 0,
         'ALTITUDE': 0,
         'HEADING': 0,
-        'SPEED': 0
+        'SPEED': 100
     }
 
-    def __init__(self, FMC, lcd_address):
+    def __init__(self, FMC, config):
         self.FMC = FMC
-        self.lcd_address = lcd_address
         self.init_lcd()
+        self.init_radio_displays()
 
     def init_lcd(self):
-        self.lcd = i2c_lcd.lcd(addr=self.lcd_address)
+        self.lcd = i2c_lcd.lcd(addr=self.FMC.config['lcd_address'])
         self.lcd.lcd_display_string_pos("FMC Desktop", 1, 0)
         self.lcd.lcd_display_string_pos("v0.0.2!", 2, 0)
+
+    def init_radio_displays(self):
+        active_config = self.FMC.config['radio_displays']['active']
+        standby_config = self.FMC.config['radio_displays']['standby']
+
+        self.active = TM1637.TM1637Decimal(clk=active_config['clk'], dio=active_config['dio'])
+        self.standby = TM1637.TM1637Decimal(clk=standby_config['clk'], dio=standby_config['dio'])
+
+        self.active.brightness(0)
+        self.standby.brightness(0)
+
+        self.active.write([0, 0, 0, 0, 0, 0])
+        self.standby.write([0, 0, 0, 0, 0, 0])
+
+        self.active.write(self.active.encode_string(self.VALUES['RADIO_COM_1_ACTIVE']))
+        self.standby.write(self.standby.encode_string(f"{self.VALUES['RADIO_COM_1_STBY_LEFT']}.{self.VALUES['RADIO_COM_1_STBY_RIGHT']}"))
 
     def get_menu_item_key(self):
         keys = list(self.MENU_ITEMS.keys())
@@ -57,6 +75,10 @@ class Interface():
         return self.MENU_ITEMS[self.get_menu_item_key()]['display_name']
 
     def show(self):
+
+        self.active.write(self.active.encode_string(self.VALUES['RADIO_COM_1_ACTIVE']))
+        # self.standby.write(self.standby.encode_string(f"{self.VALUES['RADIO_COM_1_STBY_LEFT']}.{self.VALUES['RADIO_COM_1_STBY_RIGHT']}"))
+
         rows = []
         rows.append(f"{self.get_menu_item_name()}")
         rows = self.append_content(rows)
@@ -73,7 +95,7 @@ class Interface():
                 "step": 1,
                 "min": 0,
                 "max": len(self.MENU_ITEMS) - 1,
-                "color": 0xFF0000
+                "color": 0x220000
             }
 
     def append_content(self, rows):
@@ -84,13 +106,13 @@ class Interface():
             content = self.get_radio_output()
 
         if self.ACTIVE_MENU_ITEM == 1:
-            content = self.get_altitude_output()
+            content = self.get_speed_output()
 
         if self.ACTIVE_MENU_ITEM == 2:
             content = self.get_heading_output()
 
         if self.ACTIVE_MENU_ITEM == 3:
-            content = self.get_speed_output()
+            content = self.get_altitude_output()
 
         for row in content:
             rows.append(row)

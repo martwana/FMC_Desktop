@@ -15,14 +15,69 @@ class FMC_Desktop():
     def __init__(self, config):
         self.config = config
 
-        self.interface = Interface.Interface(self, config['lcd_address'])
+        self.interface = Interface.Interface(self, config)
         self.encoders = EncoderSet.EncoderSet(self, config['encoders'])
         self.mqtt = MQTT_Client.MQTT_Client(self, config['mqtt'])
 
     def update_value(self, encoder, value):
         current_menu = self.interface.get_menu_item_key()
+
         if current_menu == "RADIO_COM_1":
-            pass
+            print(f'start: {value}')
+
+            if value > int(self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"]):
+                direction = 'UP'
+                extra = 5
+            else:
+                direction = 'DOWN'
+                extra = -5
+
+            if self.RADIO_ACTIVE_SEG == "RIGHT":
+
+                last = str(value).rjust(3, "0")[-2:]
+
+                print(last)
+
+                if last in ["20", "45", "70", "95"]:
+                    value = value + extra
+
+                #     if value > int(self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"]):
+                #         print('up')
+                #         value = value + 5
+                #         if value > 995:
+                #             value = 0
+                #     else:
+                #         print('down')
+                #         value = value - 5
+                #         if value < 0:
+                #             value = 995
+
+                    if value > 999:
+                        value = 0
+
+                    if value < 0:
+                        value = 995
+
+
+                    encoder.encoder.writeCounter(value)
+                
+            print(f'end: {value}')
+            self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"] = value
+
+            LEFT = self.interface.VALUES[f"RADIO_COM_1_STBY_LEFT"]
+            RIGHT = self.interface.VALUES[f"RADIO_COM_1_STBY_RIGHT"]
+
+            data = {
+                "RADIO_COM_1_STBY": {
+                    "ACTION": "ADJUST",
+                    "FREQ": f"{LEFT}.{RIGHT}",
+                    "DIRECTION": direction
+                }
+            }
+            self.mqtt.client.publish("FS_DATA_IN", json.dumps(data))
+
+            self.interface.standby.write(self.interface.standby.encode_string(f"{LEFT}.{RIGHT}"))
+
         else: 
             self.interface.VALUES[self.interface.MENU_ITEMS[current_menu]['variable']] = value
             data = {
@@ -41,6 +96,16 @@ class FMC_Desktop():
 
     def double_button_press(self):
         if self.interface.get_menu_item_key() == "RADIO_COM_1":
+
+            new_stby = self.interface.VALUES['RADIO_COM_1_ACTIVE']
+
+            self.interface.VALUES['RADIO_COM_1_ACTIVE'] = f"{self.interface.VALUES['RADIO_COM_1_STBY_LEFT']}.{self.interface.VALUES['RADIO_COM_1_STBY_RIGHT']}"
+
+            bits = new_stby.split(".")
+
+            self.interface.VALUES['RADIO_COM_1_STBY_LEFT'] = bits[0]
+            self.interface.VALUES['RADIO_COM_1_STBY_RIGHT'] = bits[1]
+
             data = {
                 "RADIO_COM_1_STBY": {
                     "ACTION": "SWAP"
@@ -49,13 +114,15 @@ class FMC_Desktop():
             self.mqtt.client.publish("FS_DATA_IN", json.dumps(data))
 
     def increment_value(self):
-        if self.interface.get_menu_item_key() == "RADIO_COM_1":
-            self.send_radio_update("UP")
+        pass
+        # if self.interface.get_menu_item_key() == "RADIO_COM_1":
+        #     self.send_radio_update("UP")
         
 
     def decrement_value(self):
-        if self.interface.get_menu_item_key() == "RADIO_COM_1":
-            self.send_radio_update("DOWN")
+        pass
+        # if self.interface.get_menu_item_key() == "RADIO_COM_1":
+        #     self.send_radio_update("DOWN")
 
     def send_radio_update(self, direction):
         if self.interface.get_menu_item_key() == "RADIO_COM_1":
@@ -101,25 +168,25 @@ class FMC_Desktop():
                 "step": 1,
                 "min": 0,
                 "max": 359,
-                "color": 0x00FF00
+                "color": 0x001100
             },
             "SPEED": {
                 "step": 1,
-                "min": 0,
+                "min": 100,
                 "max": 400,
-                "color": 0x0000FF
+                "color": 0x000011
             },
             "RADIO_COM_1_LEFT": {
                 "step": 1,
-                "min": 0,
-                "max": 1,
+                "min": 118,
+                "max": 135,
                 "color": 0x0f0f0f
             },
             "RADIO_COM_1_RIGHT": {
-                "step": 1,
+                "step": 5,
                 "min": 0,
-                "max": 1,
-                "color": 0xFF0022
+                "max": 995,
+                "color": 0x110022
             }
         }
 
@@ -140,6 +207,16 @@ class FMC_Desktop():
 
 config = {
     'lcd_address': 0x27,
+    'radio_displays': {
+        'active': {
+            'clk': 21,
+            'dio': 20
+        },
+        'standby': {
+            'clk': 26,
+            'dio': 19
+        }
+    },
     'encoders': {
         "interrupt_pin": 4,
         "device_mapping": [
@@ -154,11 +231,12 @@ config = {
         ]
     },
     'mqtt': {
-        'broker': "localhost",
+        'broker': "192.168.100.200",
         "client_name": "FMC_Desktop"
     }
 }
 
 fmc = FMC_Desktop(config)
 
+fmc.interface.VALUES['RADIO_COM_1_ACTIVE'] = "122.800"
 fmc.run()

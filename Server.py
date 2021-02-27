@@ -19,7 +19,7 @@ class Server():
         self.aircraftEvents = AircraftEvents(self.sc)
 
     def init_mqtt(self):
-        mqttBroker ="192.168.100.148" 
+        mqttBroker ="192.168.100.200" 
         self.mqttClient = mqtt.Client("PC")
         self.mqttClient.connect(mqttBroker) 
 
@@ -42,18 +42,41 @@ class Server():
             self.updateByEvent("HEADING_BUG_SET", value)
         elif key == "RADIO_COM_1_STBY":
 
+            print(value['DIRECTION'])
+
             if value['ACTION'] == "ADJUST":
 
-                if value['SIDE'] == "LEFT":
-                    if value['DIRECTION'] == "UP":
-                        self.aircraftEvents.find("COM_RADIO_WHOLE_INC")()
-                    else: 
-                        self.aircraftEvents.find("COM_RADIO_WHOLE_DEC")()
-                elif value['SIDE'] == "RIGHT":
-                    if value['DIRECTION'] == "UP":
-                        self.aircraftEvents.find("COM_RADIO_FRACT_INC")()
-                    else: 
-                        self.aircraftEvents.find("COM_RADIO_FRACT_DEC")()
+                def to_radio_bcd16(val):
+                  encodable = int(val * 100)
+                  remainder = ((val * 100) - encodable) / 100.0
+                  return int(str(encodable), 16), round(remainder,3), val
+
+                setterStr = 'COM_STBY_RADIO_SET'
+                value = float(value['FREQ'])
+                encoded, remainder, value = to_radio_bcd16(value)
+
+                print(encoded, remainder, value)
+
+                setter = self.aircraftEvents.find(setterStr)
+                setter(encoded)
+
+                last = str(value).split('.')[1].ljust(3, "0")[-2:]
+
+                print(last)
+
+                if last in ["05", "15", "35", "55", "65", "85", "90"]: 
+                    self.aircraftEvents.find("COM_RADIO_FRACT_INC")()
+
+                # if value['SIDE'] == "LEFT":
+                #     if value['DIRECTION'] == "UP":
+                #         self.aircraftEvents.find("COM_RADIO_WHOLE_INC")()
+                #     else: 
+                #         self.aircraftEvents.find("COM_RADIO_WHOLE_DEC")()
+                # elif value['SIDE'] == "RIGHT":
+                #     if value['DIRECTION'] == "UP":
+                #         self.aircraftEvents.find("COM_RADIO_FRACT_INC")()
+                #     else: 
+                #         self.aircraftEvents.find("COM_RADIO_FRACT_DEC")()
             elif value['ACTION'] == "SWAP":
                 self.aircraftEvents.find("COM_STBY_RADIO_SWAP")()
             
@@ -79,6 +102,7 @@ class Server():
                     "SPEED": '{:.0f}'.format(self.aircraftReqs.get("AUTOPILOT_AIRSPEED_HOLD_VAR"))
                 }
                 self.mqttClient.publish("FS_DATA_OUT", json.dumps(data))
+                time.sleep(1)
             except Exception as e:
                 print(e)
         
