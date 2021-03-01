@@ -23,46 +23,51 @@ class FMC_Desktop():
         current_menu = self.interface.get_menu_item_key()
 
         if current_menu == "RADIO_COM_1":
-            print(f'start: {value}')
 
-            if value > int(self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"]):
+            strvalue = str(value).rjust(3, "0")
+            newfreq = strvalue
+
+            currentvalue =  int(self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"])
+
+            if currentvalue == 0 and value == 990:
+                direction = 'DOWN'
+                extra = 0
+            elif value > int(self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"]):
                 direction = 'UP'
                 extra = 5
             else:
                 direction = 'DOWN'
                 extra = -5
 
+
             if self.RADIO_ACTIVE_SEG == "RIGHT":
 
-                last = str(value).rjust(3, "0")[-2:]
+                strvalue = str(value).rjust(3, "0")
+                newvalue = strvalue
 
-                print(last)
+                first = int(strvalue[:1])
+                last = strvalue[-2:]
 
                 if last in ["20", "45", "70", "95"]:
-                    value = value + extra
 
-                #     if value > int(self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"]):
-                #         print('up')
-                #         value = value + 5
-                #         if value > 995:
-                #             value = 0
-                #     else:
-                #         print('down')
-                #         value = value - 5
-                #         if value < 0:
-                #             value = 995
+                    newlast = int(last) + extra
 
-                    if value > 999:
-                        value = 0
+                    if newlast > 90:
+                        newlast = 0
+                        first += 1
+                    if newlast < 0:
+                        newlast = 90
+                        first -= 1
 
-                    if value < 0:
-                        value = 995
+                    if first > 9:
+                        first = 0
+                    if first < 0:
+                        first = 9
 
+                    newfreq = str(f'{first}{newlast}').ljust(3, "0")
+                    encoder.encoder.writeCounter(int(newfreq))
 
-                    encoder.encoder.writeCounter(value)
-                
-            print(f'end: {value}')
-            self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"] = value
+            self.interface.VALUES[f"RADIO_COM_1_STBY_{self.RADIO_ACTIVE_SEG}"] = newfreq
 
             LEFT = self.interface.VALUES[f"RADIO_COM_1_STBY_LEFT"]
             RIGHT = self.interface.VALUES[f"RADIO_COM_1_STBY_RIGHT"]
@@ -74,8 +79,8 @@ class FMC_Desktop():
                     "DIRECTION": direction
                 }
             }
-            self.mqtt.client.publish("FS_DATA_IN", json.dumps(data))
 
+            self.mqtt.client.publish("FS_DATA_IN", json.dumps(data))
             self.interface.standby.write(self.interface.standby.encode_string(f"{LEFT}.{RIGHT}"))
 
         else: 
@@ -105,6 +110,8 @@ class FMC_Desktop():
 
             self.interface.VALUES['RADIO_COM_1_STBY_LEFT'] = bits[0]
             self.interface.VALUES['RADIO_COM_1_STBY_RIGHT'] = bits[1]
+
+            self.interface.update_radio_displays()
 
             data = {
                 "RADIO_COM_1_STBY": {
@@ -149,8 +156,8 @@ class FMC_Desktop():
                 self.RADIO_ACTIVE_SEG = "RIGHT"
             else:
                 self.RADIO_ACTIVE_SEG = "LEFT"
-        
             self.encoders.encoders['value'].set_encoder_config(self.get_encoder_definition())
+            self.interface.radio_stby_flash()
 
     def get_altitude_steps(self):
         return self.ALTITUDE_STEPS
@@ -185,7 +192,7 @@ class FMC_Desktop():
             "RADIO_COM_1_RIGHT": {
                 "step": 5,
                 "min": 0,
-                "max": 995,
+                "max": 990,
                 "color": 0x110022
             }
         }
@@ -201,6 +208,8 @@ class FMC_Desktop():
     def run(self):
         print("starting")
         self.interface.clear()
+        sleep(2)
+        self.interface.update_radio_displays()
         while True:
             self.interface.show()
 

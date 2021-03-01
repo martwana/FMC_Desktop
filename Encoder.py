@@ -23,7 +23,7 @@ class Encoder():
         return self.encoder_set.FMC.interface.MENU_ITEMS_KEYS
 
     def set_encoder_config(self, config):
-        self.encoder.writeAntibouncingPeriod(25)
+        self.encoder.writeAntibouncingPeriod(50)
         self.encoder.writeDoublePushPeriod(50)
         self.encoder.writeStep(config['step'])
         self.encoder.writeMin(config['min'])

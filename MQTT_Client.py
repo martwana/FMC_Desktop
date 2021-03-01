@@ -30,6 +30,7 @@ class MQTT_Client():
                     right = parts[1]
                     self.FMC.interface.VALUES['RADIO_COM_1_STBY_LEFT'] = left
                     self.FMC.interface.VALUES['RADIO_COM_1_STBY_RIGHT'] = right.ljust(3, "0")
+                    # self.FMC.interface.update_radio_displays()
 
             if data['HEADING']:
                 self.FMC.interface.VALUES['HEADING'] = data['HEADING']

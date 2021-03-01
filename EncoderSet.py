@@ -22,7 +22,7 @@ class EncoderSet():
         GPIO.setup(self.config['interrupt_pin'], GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     def add_gpio_event_detect(self):
-        GPIO.add_event_detect(self.config['interrupt_pin'], GPIO.FALLING, callback=self.encoder_interrupt, bouncetime=10)
+        GPIO.add_event_detect(self.config['interrupt_pin'], GPIO.FALLING, callback=self.encoder_interrupt, bouncetime=5)
 
     def encoder_interrupt(self, pin):
         for encoder in self.encoders.keys():

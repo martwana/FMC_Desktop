@@ -2,6 +2,7 @@
 
 import i2c_lcd
 import TM1637
+from time import sleep
 
 class Interface():
 
@@ -34,7 +35,7 @@ class Interface():
 
     VALUES = {
         'RADIO_COM_1_STBY_LEFT': 121,
-        'RADIO_COM_1_STBY_RIGHT': 800,
+        'RADIO_COM_1_STBY_RIGHT': 500,
         'RADIO_COM_1_ACTIVE': 0,
         'ALTITUDE': 0,
         'HEADING': 0,
@@ -64,8 +65,27 @@ class Interface():
         self.active.write([0, 0, 0, 0, 0, 0])
         self.standby.write([0, 0, 0, 0, 0, 0])
 
+    def update_radio_displays(self):
         self.active.write(self.active.encode_string(self.VALUES['RADIO_COM_1_ACTIVE']))
         self.standby.write(self.standby.encode_string(f"{self.VALUES['RADIO_COM_1_STBY_LEFT']}.{self.VALUES['RADIO_COM_1_STBY_RIGHT']}"))
+
+    def dim_radios(self):
+        self.active.brightness(0)
+        self.standby.brightness(0)
+
+    def light_radios(self):
+        self.active.brightness(2)
+        self.standby.brightness(2)
+
+    def radio_stby_flash(self):
+        self.standby.write([0, 0, 0, 0, 0, 0])
+        sleep(0.08)
+        self.standby.write(self.standby.encode_string(f"{self.VALUES['RADIO_COM_1_STBY_LEFT']}.{self.VALUES['RADIO_COM_1_STBY_RIGHT']}"))
+        sleep(0.08)
+        self.standby.write([0, 0, 0, 0, 0, 0])
+        sleep(0.08)
+        self.standby.write(self.standby.encode_string(f"{self.VALUES['RADIO_COM_1_STBY_LEFT']}.{self.VALUES['RADIO_COM_1_STBY_RIGHT']}"))
+
 
     def get_menu_item_key(self):
         keys = list(self.MENU_ITEMS.keys())
@@ -77,7 +97,6 @@ class Interface():
     def show(self):
 
         self.active.write(self.active.encode_string(self.VALUES['RADIO_COM_1_ACTIVE']))
-        # self.standby.write(self.standby.encode_string(f"{self.VALUES['RADIO_COM_1_STBY_LEFT']}.{self.VALUES['RADIO_COM_1_STBY_RIGHT']}"))
 
         rows = []
         rows.append(f"{self.get_menu_item_name()}")
@@ -95,14 +114,17 @@ class Interface():
                 "step": 1,
                 "min": 0,
                 "max": len(self.MENU_ITEMS) - 1,
-                "color": 0x220000
+                "color": 0xFF0000
             }
 
     def append_content(self, rows):
 
         content = []
 
+        # self.dim_radios()
+
         if self.ACTIVE_MENU_ITEM == 0:
+            # self.light_radios()
             content = self.get_radio_output()
 
         if self.ACTIVE_MENU_ITEM == 1:
@@ -122,12 +144,12 @@ class Interface():
     def get_radio_output(self, raw=False):
         rows = []
 
-        if self.VALUES['RADIO_COM_1_ACTIVE'] and self.VALUES['RADIO_COM_1_STBY_LEFT'] and self.VALUES['RADIO_COM_1_STBY_RIGHT']:
-            standby = f"{str(self.VALUES['RADIO_COM_1_STBY_LEFT']).rjust(3, '0')}.{str(self.VALUES['RADIO_COM_1_STBY_RIGHT']).rjust(3, '0')}"
-            active = self.VALUES['RADIO_COM_1_ACTIVE']
+        # if self.VALUES['RADIO_COM_1_ACTIVE'] and self.VALUES['RADIO_COM_1_STBY_LEFT'] and self.VALUES['RADIO_COM_1_STBY_RIGHT']:
+        #     standby = f"{str(self.VALUES['RADIO_COM_1_STBY_LEFT']).rjust(3, '0')}.{str(self.VALUES['RADIO_COM_1_STBY_RIGHT']).rjust(3, '0')}"
+        #     active = self.VALUES['RADIO_COM_1_ACTIVE']
 
-            output = f'{active}      {standby}'
-            rows.append(output)
+        #     output = f'{active}      {standby}'
+        #     rows.append(output)
 
         return rows
 
